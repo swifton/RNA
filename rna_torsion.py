@@ -30,8 +30,19 @@ epsilon_3cyt = ["C/12/C4'", "C/12/C3'", "C/12/O3'", "C/13/P"]
 zeta_3cyt = ["C/12/C3'", "C/12/O3'", "C/13/P", "C/13/OP2"]
 torsion_angles_3cyt = [alpha_3cyt, beta_3cyt, gamma_3cyt, epsilon_3cyt, zeta_3cyt, chi_3cyt]
 
+# Torsion angle definitions for 9KTW-protein-3Isoleucine.pdb (3 isoleucine residues, chain B, residues 343-345)
+# Protein backbone angles: phi, psi; Side chain angles: chi1, chi2
+# Using middle residue (344) for demonstration
+# Phi and psi reversed so N-terminus rotates, C-terminus stays fixed
+phi_3ile = ["B/344/CA", "B/344/N", "B/343/C", "B/343/O"]
+psi_3ile = ["B/345/N", "B/344/C", "B/344/CA", "B/344/N"]
+# Chi1 and chi2 reversed so backbone stays fixed, side chain rotates
+chi1_3ile = ["B/344/N", "B/344/CA", "B/344/CB", "B/344/CG1"]
+chi2_3ile = ["B/344/CA", "B/344/CB", "B/344/CG1", "B/344/CD1"]
+torsion_angles_3ile = [phi_3ile, psi_3ile, chi1_3ile, chi2_3ile]
+
 # Select which molecule to use
-torsion_angles = torsion_angles_3cyt
+torsion_angles = torsion_angles_3ile
 
 
 def dihedral_angle(specs):
