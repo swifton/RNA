@@ -8,10 +8,11 @@ except NameError:
     record = False
 
 # Torsion angle definitions for 3G9Y-RNA-short.pdb
-chi_3nt = ["C/2/C4", "C/2/N9", "C/2/C1'", "C/2/O4'"]
-alpha_3nt = ["C/2/OP2", "C/2/P", "C/2/O5'", "C/2/C5'"]
-beta_3nt = ["C/2/P", "C/2/O5'", "C/2/C5'", "C/2/C4'"]
-gamma_3nt = ["C/2/O5'", "C/2/C5'", "C/2/C4'", "C/2/C3'"]
+# Alpha, beta, gamma, chi reversed so 5' end rotates, 3' end stays fixed
+chi_3nt = ["C/2/O4'", "C/2/C1'", "C/2/N9", "C/2/C4"]
+alpha_3nt = ["C/2/C5'", "C/2/O5'", "C/2/P", "C/2/OP2"]
+beta_3nt = ["C/2/C4'", "C/2/C5'", "C/2/O5'", "C/2/P"]
+gamma_3nt = ["C/2/C3'", "C/2/C4'", "C/2/C5'", "C/2/O5'"]
 delta_3nt = ["C/2/C5'", "C/2/C4'", "C/2/C3'", "C/2/O3'"]
 epsilon_3nt = ["C/2/C4'", "C/2/C3'", "C/2/O3'", "C/3/P"]
 zeta_3nt = ["C/2/C3'", "C/2/O3'", "C/3/P", "C/3/OP2"]
@@ -19,10 +20,11 @@ torsion_angles_3nt = [alpha_3nt, beta_3nt, gamma_3nt, epsilon_3nt, zeta_3nt, chi
 
 # Torsion angle definitions for 9KTW-RNA-3Cytosine.pdb (3 cytosine nucleotides, chain C, residues 11-13)
 # Chi uses N1 for pyrimidines (C, U)
-chi_3cyt = ["C/12/C2", "C/12/N1", "C/12/C1'", "C/12/O4'"]
-alpha_3cyt = ["C/12/OP2", "C/12/P", "C/12/O5'", "C/12/C5'"]
-beta_3cyt = ["C/12/P", "C/12/O5'", "C/12/C5'", "C/12/C4'"]
-gamma_3cyt = ["C/12/O5'", "C/12/C5'", "C/12/C4'", "C/12/C3'"]
+# Alpha, beta, gamma, chi reversed so 5' end rotates, 3' end stays fixed
+chi_3cyt = ["C/12/O4'", "C/12/C1'", "C/12/N1", "C/12/C2"]
+alpha_3cyt = ["C/12/C5'", "C/12/O5'", "C/12/P", "C/12/OP2"]
+beta_3cyt = ["C/12/C4'", "C/12/C5'", "C/12/O5'", "C/12/P"]
+gamma_3cyt = ["C/12/C3'", "C/12/C4'", "C/12/C5'", "C/12/O5'"]
 delta_3cyt = ["C/12/C5'", "C/12/C4'", "C/12/C3'", "C/12/O3'"]
 epsilon_3cyt = ["C/12/C4'", "C/12/C3'", "C/12/O3'", "C/13/P"]
 zeta_3cyt = ["C/12/C3'", "C/12/O3'", "C/13/P", "C/13/OP2"]
