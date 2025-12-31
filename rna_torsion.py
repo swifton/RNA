@@ -35,11 +35,21 @@ object_name = cmd.get_names("objects")[0]  # Get the loaded molecule name
 
 frame = 1
 
-def rotate_individually():
+def rotate(angle_index=None):
+    """Rotate torsion angle(s) through 360 degrees.
+
+    Args:
+        angle_index: Index of the angle to rotate (0-5), or None to rotate all angles sequentially.
+    """
     global frame
-    for i in range(len(torsion_angles)):
+    if angle_index is not None:
+        indices = [angle_index]
+    else:
+        indices = range(len(torsion_angles))
+
+    for i in indices:
         torsion_angle = torsion_angles[i]
-        initial_value = int(initial_values[i])
+        initial_value = int(dihedral_angle(torsion_angle))
         for angle in range(initial_value, initial_value + 360, 10):
             cmd.create(object_name, object_name, 1, frame + 1)
             set_torsion(torsion_angle, angle, state=frame + 1)
@@ -49,21 +59,7 @@ def rotate_individually():
         frame += 1
 
 
-def rotate_together():
-    global frame
-    for angle in range(0, 360, 10):
-        cmd.create(object_name, object_name, 1, frame + 1)
-        for i in range(len(torsion_angles)):
-            torsion_angle = torsion_angles[i]
-            set_torsion(torsion_angle, angle, state=frame + 1)
-        frame += 1
-
-
-rotate_individually()
-rotate_together()
-
-# Hide dihedral angle indicator arrows
-cmd.hide("dihedrals")
+rotate(0)
 
 # Set up movie from all states and play
 cmd.mset(f"1 -{frame}")
@@ -72,7 +68,4 @@ cmd.mplay()
 if record:
     output_path = os.path.expanduser("~/projects/RNA/ChimeraX/movies/test.mp4")
     cmd.movie.produce(output_path, quality=90)
-
-# Restore initial torsion values
-for atoms, initial_angle in zip(torsion_angles, initial_values):
-    set_torsion(atoms, initial_angle)
+    
