@@ -7,15 +7,29 @@ try:
 except NameError:
     record = False
 
-# PyMOL atom selections (chain C, residue 2)
-chi = ["C/2/C4", "C/2/N9", "C/2/C1'", "C/2/O4'"]
-alpha = ["C/2/OP2", "C/2/P", "C/2/O5'", "C/2/C5'"]
-beta = ["C/2/P", "C/2/O5'", "C/2/C5'", "C/2/C4'"]
-gamma = ["C/2/O5'", "C/2/C5'", "C/2/C4'", "C/2/C3'"]
-delta = ["C/2/C5'", "C/2/C4'", "C/2/C3'", "C/2/O3'"]
-epsilon = ["C/2/C4'", "C/2/C3'", "C/2/O3'", "C/3/P"]
-zeta = ["C/2/C3'", "C/2/O3'", "C/3/P", "C/3/OP2"]
-torsion_angles = [alpha, beta, gamma, epsilon, zeta, chi]
+# Torsion angle definitions for 3G9Y-RNA-short.pdb
+chi_3nt = ["C/2/C4", "C/2/N9", "C/2/C1'", "C/2/O4'"]
+alpha_3nt = ["C/2/OP2", "C/2/P", "C/2/O5'", "C/2/C5'"]
+beta_3nt = ["C/2/P", "C/2/O5'", "C/2/C5'", "C/2/C4'"]
+gamma_3nt = ["C/2/O5'", "C/2/C5'", "C/2/C4'", "C/2/C3'"]
+delta_3nt = ["C/2/C5'", "C/2/C4'", "C/2/C3'", "C/2/O3'"]
+epsilon_3nt = ["C/2/C4'", "C/2/C3'", "C/2/O3'", "C/3/P"]
+zeta_3nt = ["C/2/C3'", "C/2/O3'", "C/3/P", "C/3/OP2"]
+torsion_angles_3nt = [alpha_3nt, beta_3nt, gamma_3nt, epsilon_3nt, zeta_3nt, chi_3nt]
+
+# Torsion angle definitions for 9KTW-RNA-3Cytosine.pdb (3 cytosine nucleotides, chain C, residues 11-13)
+# Chi uses N1 for pyrimidines (C, U)
+chi_3cyt = ["C/12/C2", "C/12/N1", "C/12/C1'", "C/12/O4'"]
+alpha_3cyt = ["C/12/OP2", "C/12/P", "C/12/O5'", "C/12/C5'"]
+beta_3cyt = ["C/12/P", "C/12/O5'", "C/12/C5'", "C/12/C4'"]
+gamma_3cyt = ["C/12/O5'", "C/12/C5'", "C/12/C4'", "C/12/C3'"]
+delta_3cyt = ["C/12/C5'", "C/12/C4'", "C/12/C3'", "C/12/O3'"]
+epsilon_3cyt = ["C/12/C4'", "C/12/C3'", "C/12/O3'", "C/13/P"]
+zeta_3cyt = ["C/12/C3'", "C/12/O3'", "C/13/P", "C/13/OP2"]
+torsion_angles_3cyt = [alpha_3cyt, beta_3cyt, gamma_3cyt, epsilon_3cyt, zeta_3cyt, chi_3cyt]
+
+# Select which molecule to use
+torsion_angles = torsion_angles_3cyt
 
 
 def dihedral_angle(specs):
@@ -59,7 +73,7 @@ def rotate(angle_index=None):
         frame += 1
 
 
-rotate(0)
+rotate()
 
 # Set up movie from all states and play
 cmd.mset(f"1 -{frame}")
