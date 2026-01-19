@@ -42,7 +42,7 @@ chi2_3ile = ["B/344/CA", "B/344/CB", "B/344/CG1", "B/344/CD1"]
 torsion_angles_3ile = [phi_3ile, psi_3ile, chi1_3ile, chi2_3ile]
 
 # Select which molecule to use
-torsion_angles = torsion_angles_3ile
+torsion_angles = torsion_angles_3cyt
 
 
 def dihedral_angle(specs):
