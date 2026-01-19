@@ -80,6 +80,7 @@ def rotate(angle_index=None):
         for angle in range(initial_value, initial_value + 360, 10):
             cmd.create(object_name, object_name, 1, frame + 1)
             set_torsion(torsion_angle, angle, state=frame + 1)
+            cmd.unpick()
             frame += 1
         # Reset to initial value for next torsion angle
         cmd.create(object_name, object_name, 1, frame + 1)
