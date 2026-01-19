@@ -94,6 +94,6 @@ cmd.mset(f"1 -{frame}")
 cmd.mplay()
 
 if record:
-    output_path = os.path.expanduser("~/projects/RNA/ChimeraX/movies/test.mp4")
+    output_path = os.path.expanduser("~/projects/RNA/movies/test.mp4")
     cmd.movie.produce(output_path, quality=90)
     
