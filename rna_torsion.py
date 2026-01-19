@@ -63,10 +63,10 @@ object_name = cmd.get_names("objects")[0]  # Get the loaded molecule name
 frame = 1
 
 def rotate(angle_index=None):
-    """Rotate torsion angle(s) through 360 degrees.
+    """Rotate torsion angle(s) through 360 degrees sequentially.
 
     Args:
-        angle_index: Index of the angle to rotate (0-5), or None to rotate all angles sequentially.
+        angle_index: Index of the angle to rotate, or None to rotate all angles sequentially.
     """
     global frame
     if angle_index is not None:
@@ -87,7 +87,39 @@ def rotate(angle_index=None):
         frame += 1
 
 
-rotate()
+def rotate_simultaneously(angle_indices=None, directions=None):
+    """Rotate multiple torsion angles simultaneously (crankshaft motion).
+
+    Args:
+        angle_indices: List of indices of angles to rotate, or None for all angles.
+        directions: List of directions (1 or -1) for each angle, or None for all positive.
+                   Use opposite directions (e.g., [1, -1]) to visualize compensating rotations.
+    """
+    global frame
+    if angle_indices is None:
+        angle_indices = list(range(len(torsion_angles)))
+    if directions is None:
+        directions = [1] * len(angle_indices)
+
+    # Get initial values for selected angles
+    selected_angles = [torsion_angles[i] for i in angle_indices]
+    selected_initial = [int(dihedral_angle(a)) for a in selected_angles]
+
+    for step in range(0, 360, 1):
+        cmd.create(object_name, object_name, 1, frame + 1)
+        for torsion_angle, initial_value, direction in zip(
+            selected_angles, selected_initial, directions
+        ):
+            new_angle = initial_value + step * direction
+            set_torsion(torsion_angle, new_angle, state=frame + 1)
+            cmd.unpick()
+        frame += 1
+
+    # Add final frame reset to initial values
+    cmd.create(object_name, object_name, 1, frame + 1)
+    frame += 1
+
+rotate_simultaneously([0, 2], [1, -1])
 
 # Set up movie from all states and play
 cmd.mset(f"1 -{frame}")
