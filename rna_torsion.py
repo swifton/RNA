@@ -35,7 +35,7 @@ torsion_angles_3cyt = [alpha_3cyt, beta_3cyt, gamma_3cyt, epsilon_3cyt, zeta_3cy
 # Using middle residue (344) for demonstration
 # Phi and psi reversed so N-terminus rotates, C-terminus stays fixed
 phi_3ile = ["B/344/CA", "B/344/N", "B/343/C", "B/343/O"]
-psi_3ile = ["B/345/N", "B/344/C", "B/344/CA", "B/344/N"]
+psi_3ile = ["B/344/N", "B/344/CA", "B/344/C", "B/345/N"]
 # Chi1 and chi2 reversed so backbone stays fixed, side chain rotates
 chi1_3ile = ["B/344/N", "B/344/CA", "B/344/CB", "B/344/CG1"]
 chi2_3ile = ["B/344/CA", "B/344/CB", "B/344/CG1", "B/344/CD1"]
