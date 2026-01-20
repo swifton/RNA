@@ -29,15 +29,16 @@ def rna_atoms(chain, res, next_res=None, base_type="purine"):
 def rna_torsion_angles(atoms):
     """Define RNA torsion angles from atom dictionaries.
 
-    Alpha, beta, gamma, chi are reversed so 5' end rotates, 3' end stays fixed.
+    All angles are in standard (direct) order: 5' to 3' direction.
+    Use direction=-1 in rotate/rotate_simultaneously to flip which side rotates.
     """
     a = atoms
     angles = {
-        "alpha": [a["C5'"], a["O5'"], a["P"], a["OP2"]],
-        "beta": [a["C4'"], a["C5'"], a["O5'"], a["P"]],
-        "gamma": [a["C3'"], a["C4'"], a["C5'"], a["O5'"]],
+        "alpha": [a["OP2"], a["P"], a["O5'"], a["C5'"]],
+        "beta": [a["P"], a["O5'"], a["C5'"], a["C4'"]],
+        "gamma": [a["O5'"], a["C5'"], a["C4'"], a["C3'"]],
         "delta": [a["C5'"], a["C4'"], a["C3'"], a["O3'"]],
-        "chi": [a["O4'"], a["C1'"], a["chi_N"], a["chi_C"]],
+        "chi": [a["chi_C"], a["chi_N"], a["C1'"], a["O4'"]],
     }
     if a["next_P"] and a["next_OP2"]:
         angles["epsilon"] = [a["C4'"], a["C3'"], a["O3'"], a["next_P"]]
@@ -96,19 +97,25 @@ object_name = cmd.get_names("objects")[0]  # Get the loaded molecule name
 
 frame = 1
 
-def rotate(angle_names=None):
+def rotate(angle_names=None, directions=None):
     """Rotate torsion angle(s) through 360 degrees sequentially.
 
     Args:
         angle_names: List of angle names to rotate (e.g., ["alpha", "beta"]),
                     or None to rotate all angles sequentially.
+        directions: List of directions (1 or -1) for each angle, or None for all positive.
+                   Direction -1 flips the angle so the opposite side of the molecule rotates.
     """
     global frame
     if angle_names is None:
         angle_names = list(torsion_angles.keys())
+    if directions is None:
+        directions = [1] * len(angle_names)
 
-    for name in angle_names:
+    for name, direction in zip(angle_names, directions):
         angle_specs = torsion_angles[name]
+        if direction == -1:
+            angle_specs = angle_specs[::-1]  # Flip the angle
         initial_value = int(dihedral_angle(angle_specs))
         for angle in range(initial_value, initial_value + 360, 10):
             cmd.create(object_name, object_name, 1, frame + 1)
@@ -127,7 +134,7 @@ def rotate_simultaneously(angle_names=None, directions=None):
         angle_names: List of angle names to rotate (e.g., ["alpha", "gamma"]),
                     or None for all angles.
         directions: List of directions (1 or -1) for each angle, or None for all positive.
-                   Use opposite directions (e.g., [1, -1]) to visualize compensating rotations.
+                   Direction -1 flips the angle so the opposite side of the molecule rotates.
     """
     global frame
     if angle_names is None:
@@ -135,16 +142,19 @@ def rotate_simultaneously(angle_names=None, directions=None):
     if directions is None:
         directions = [1] * len(angle_names)
 
-    # Get angle specs and initial values for selected angles
-    selected_angles = [torsion_angles[name] for name in angle_names]
+    # Get angle specs (flipped if direction is -1) and initial values
+    selected_angles = []
+    for name, direction in zip(angle_names, directions):
+        angle_specs = torsion_angles[name]
+        if direction == -1:
+            angle_specs = angle_specs[::-1]  # Flip the angle
+        selected_angles.append(angle_specs)
     selected_initial = [int(dihedral_angle(a)) for a in selected_angles]
 
     for step in range(0, 360, 1):
         cmd.create(object_name, object_name, 1, frame + 1)
-        for angle_specs, initial_value, direction in zip(
-            selected_angles, selected_initial, directions
-        ):
-            new_angle = initial_value + step * direction
+        for angle_specs, initial_value in zip(selected_angles, selected_initial):
+            new_angle = initial_value + step
             set_torsion(angle_specs, new_angle, state=frame + 1)
             cmd.unpick()
         frame += 1
@@ -154,7 +164,7 @@ def rotate_simultaneously(angle_names=None, directions=None):
     frame += 1
 
 # rotate_simultaneously(["alpha_12"], [1])
-rotate_simultaneously(["alpha_12", "gamma_11", "zeta_11"], [1, -1, 1])
+rotate_simultaneously(["alpha_12", "gamma_12", "zeta_11"], [1, -1, 1])
 
 # rotate()
 
