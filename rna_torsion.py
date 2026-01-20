@@ -51,10 +51,23 @@ torsion_angles_3nt = [angles_3nt["alpha"], angles_3nt["beta"], angles_3nt["gamma
                       angles_3nt["epsilon"], angles_3nt["zeta"], angles_3nt["chi"]]
 
 # Torsion angle definitions for 9KTW-RNA-3Cytosine.pdb (3 cytosine nucleotides)
-atoms_3cyt = rna_atoms("C", 12, 13, "pyrimidine")
-angles_3cyt = rna_torsion_angles(atoms_3cyt)
-torsion_angles_3cyt = [angles_3cyt["alpha"], angles_3cyt["beta"], angles_3cyt["gamma"],
-                       angles_3cyt["epsilon"], angles_3cyt["zeta"], angles_3cyt["chi"]]
+# Residue 11 (first cytosine) - has epsilon/zeta pointing to residue 12
+atoms_3cyt_11 = rna_atoms("C", 11, 12, "pyrimidine")
+angles_3cyt_11 = rna_torsion_angles(atoms_3cyt_11)
+
+# Residue 12 (middle cytosine) - has epsilon/zeta pointing to residue 13
+atoms_3cyt_12 = rna_atoms("C", 12, 13, "pyrimidine")
+angles_3cyt_12 = rna_torsion_angles(atoms_3cyt_12)
+
+# Residue 13 (last cytosine) - no epsilon/zeta (no next residue)
+atoms_3cyt_13 = rna_atoms("C", 13, None, "pyrimidine")
+angles_3cyt_13 = rna_torsion_angles(atoms_3cyt_13)
+
+# Combined dictionary with residue numbers in angle names
+angles_3cyt = {}
+for res, angles in [(11, angles_3cyt_11), (12, angles_3cyt_12), (13, angles_3cyt_13)]:
+    for name, specs in angles.items():
+        angles_3cyt[f"{name}_{res}"] = specs
 
 # Torsion angle definitions for 9KTW-protein-3Isoleucine.pdb (3 isoleucine residues, chain B, residues 343-345)
 # Protein backbone angles: phi, psi; Side chain angles: chi1, chi2
@@ -140,7 +153,8 @@ def rotate_simultaneously(angle_names=None, directions=None):
     cmd.create(object_name, object_name, 1, frame + 1)
     frame += 1
 
-rotate_simultaneously(["alpha", "gamma", "zeta"], [1, -1, 1])
+# rotate_simultaneously(["alpha_12"], [1])
+rotate_simultaneously(["alpha_12", "gamma_11", "zeta_11"], [1, -1, 1])
 
 # rotate()
 
