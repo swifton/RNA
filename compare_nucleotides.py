@@ -6,9 +6,11 @@ This script:
 1. Picks two random nucleotides from two random sequences
 2. Calculates differences in torsion angles and pseudotorsion angles
 3. Aligns them and calculates RMSD
-4. Repeats multiple times and generates scatter plots:
+4. Determines if both nucleotides come from helical RNA structures
+5. Repeats multiple times and generates scatter plots:
    - Torsion angle difference vs RMSD
    - Pseudotorsion angle difference vs RMSD
+   - Points colored by whether both nucleotides are from helical RNAs
 """
 
 import numpy as np
@@ -51,6 +53,9 @@ PSEUDOTORSION_ATOMS = {
 
 # All backbone atoms needed for a nucleotide (for RMSD calculation)
 BACKBONE_ATOMS = ['P', "O5'", "C5'", "C4'", "O4'", "C3'", "O3'", "C2'", "C1'"]
+
+# Cache for helicity scores to avoid recomputing
+_helicity_cache = {}
 
 
 def parse_cif_atoms(cif_path):
@@ -253,6 +258,117 @@ def angle_difference(angle1, angle2):
     return diff
 
 
+def get_backbone_atoms_for_helicity(atoms, residue_nums):
+    """Extract backbone P, C4', and C1' atoms for each residue (for helicity analysis)."""
+    backbone = {}
+    for res_num in residue_nums:
+        p = atoms.get((res_num, 'P'))
+        c4 = atoms.get((res_num, "C4'"))
+        c1 = atoms.get((res_num, "C1'"))
+
+        if p is not None and c4 is not None and c1 is not None:
+            backbone[res_num] = {'P': p, "C4'": c4, "C1'": c1}
+
+    return backbone
+
+
+def analyze_helicity(atoms, residue_info):
+    """Analyze whether the RNA structure is helical.
+
+    Returns a dict with:
+    - is_helical: Boolean indicating if structure appears helical
+    - helical_score: Score from 0-1 indicating helicity
+    """
+    if not atoms:
+        return {'is_helical': False, 'helical_score': 0.0}
+
+    residue_nums = sorted(set(r for r, _ in atoms.keys()))
+
+    if len(residue_nums) < 4:
+        return {'is_helical': False, 'helical_score': 0.0}
+
+    backbone = get_backbone_atoms_for_helicity(atoms, residue_nums)
+
+    # Calculate P-P distances
+    p_distances = []
+    rises = []
+    sorted_residues = sorted(residue_nums)
+
+    for i in range(len(sorted_residues) - 1):
+        res1, res2 = sorted_residues[i], sorted_residues[i + 1]
+        if res1 not in backbone or res2 not in backbone:
+            continue
+
+        p1 = backbone[res1]['P']
+        p2 = backbone[res2]['P']
+        p_dist = np.linalg.norm(p2 - p1)
+        p_distances.append(p_dist)
+
+        c1_1 = backbone[res1]["C1'"]
+        c1_2 = backbone[res2]["C1'"]
+        rise = np.linalg.norm(c1_2 - c1_1)
+        rises.append(rise)
+
+    # Calculate pseudo-torsion angles
+    pseudo_torsions = []
+    for i in range(len(sorted_residues) - 3):
+        res_nums = sorted_residues[i:i+4]
+        p_atoms = []
+        valid = True
+        for res in res_nums:
+            if (res, 'P') in atoms:
+                p_atoms.append(atoms[(res, 'P')])
+            else:
+                valid = False
+                break
+
+        if valid and len(p_atoms) == 4:
+            angle = dihedral_angle(p_atoms[0], p_atoms[1], p_atoms[2], p_atoms[3])
+            if angle is not None:
+                pseudo_torsions.append(angle)
+
+    # Score based on A-form helix criteria
+    helical_scores = []
+
+    if p_distances:
+        mean_p_dist = np.mean(p_distances)
+        std_p_dist = np.std(p_distances)
+        p_dist_score = max(0, 1 - abs(mean_p_dist - 5.9) / 2.0)
+        p_dist_score *= max(0, 1 - std_p_dist / 2.0)
+        helical_scores.append(p_dist_score)
+
+    if rises:
+        mean_rise = np.mean(rises)
+        std_rise = np.std(rises)
+        rise_score = max(0, 1 - abs(mean_rise - 5.3) / 2.0)
+        rise_score *= max(0, 1 - std_rise / 2.0)
+        helical_scores.append(rise_score)
+
+    if pseudo_torsions:
+        std_torsion = np.std(pseudo_torsions)
+        torsion_score = max(0, 1 - std_torsion / 60.0)
+        helical_scores.append(torsion_score)
+
+    if helical_scores:
+        helical_score = np.mean(helical_scores)
+    else:
+        helical_score = 0.0
+
+    # Use a lower threshold since most biological RNAs have complex structures
+    # with loops and bulges. Score > 0.3 indicates relatively helical.
+    is_helical = helical_score > 0.3
+
+    return {'is_helical': is_helical, 'helical_score': helical_score}
+
+
+def get_helicity(cif_path, atoms, residue_info):
+    """Get helicity for a structure, using cache to avoid recomputation."""
+    cache_key = str(cif_path)
+    if cache_key not in _helicity_cache:
+        _helicity_cache[cache_key] = analyze_helicity(atoms, residue_info)
+    return _helicity_cache[cache_key]
+
+
 def collect_cif_files(dataset_path):
     """Collect all CIF files from the rna3db dataset."""
     cif_files = []
@@ -291,7 +407,7 @@ def get_valid_residues(atoms, residue_info):
 def pick_random_nucleotide(cif_files, max_attempts=10):
     """Pick a random nucleotide from a random structure.
 
-    Returns (atoms, residue_info, res_num, cif_path) or None if failed.
+    Returns (atoms, residue_info, res_num, cif_path, is_helical) or None if failed.
     """
     for _ in range(max_attempts):
         cif_path = random.choice(cif_files)
@@ -309,7 +425,11 @@ def pick_random_nucleotide(cif_files, max_attempts=10):
             continue
 
         res_num = random.choice(interior_residues)
-        return atoms, residue_info, res_num, cif_path
+
+        # Get helicity information
+        helicity = get_helicity(cif_path, atoms, residue_info)
+
+        return atoms, residue_info, res_num, cif_path, helicity['is_helical']
 
     return None
 
@@ -389,8 +509,8 @@ def run_comparisons(dataset_path, num_comparisons=100, verbose=False):
             failed += 1
             continue
 
-        atoms1, residue_info1, res1, path1 = nuc1
-        atoms2, residue_info2, res2, path2 = nuc2
+        atoms1, residue_info1, res1, path1, is_helical1 = nuc1
+        atoms2, residue_info2, res2, path2, is_helical2 = nuc2
 
         # Compare them
         result = compare_nucleotides(atoms1, residue_info1, res1,
@@ -401,52 +521,93 @@ def run_comparisons(dataset_path, num_comparisons=100, verbose=False):
             result['path2'] = str(path2.name)
             result['res1'] = res1
             result['res2'] = res2
+            result['is_helical1'] = is_helical1
+            result['is_helical2'] = is_helical2
+            result['both_helical'] = is_helical1 and is_helical2
             results.append(result)
         else:
             failed += 1
 
     print(f"Completed {len(results)} successful comparisons ({failed} failed)")
+
+    # Print helicity statistics
+    both_helical = sum(1 for r in results if r['both_helical'])
+    print(f"  Both from helical RNAs: {both_helical} ({100*both_helical/len(results):.1f}%)")
+
     return results
 
 
 def create_plots(results, output_prefix='nucleotide_comparison'):
-    """Create scatter plots of angle differences vs RMSD."""
+    """Create scatter plots of angle differences vs RMSD, colored by helicity."""
     if not results:
         print("No results to plot")
         return
 
-    torsion_diffs = [r['torsion_diff'] for r in results]
-    pseudo_diffs = [r['pseudotorsion_diff'] for r in results]
-    rmsds = [r['rmsd'] for r in results]
+    # Separate results by helicity
+    helical_results = [r for r in results if r['both_helical']]
+    non_helical_results = [r for r in results if not r['both_helical']]
 
     fig, axes = plt.subplots(1, 2, figsize=(14, 6))
 
     # Plot 1: Torsion angle difference vs RMSD
     ax1 = axes[0]
-    ax1.scatter(torsion_diffs, rmsds, alpha=0.5, edgecolors='none', s=30)
+
+    # Plot non-helical pairs first (background)
+    if non_helical_results:
+        torsion_nh = [r['torsion_diff'] for r in non_helical_results]
+        rmsd_nh = [r['rmsd'] for r in non_helical_results]
+        ax1.scatter(torsion_nh, rmsd_nh, alpha=0.4, edgecolors='none', s=30,
+                   color='steelblue', label=f'Non-helical ({len(non_helical_results)})')
+
+    # Plot helical pairs on top
+    if helical_results:
+        torsion_h = [r['torsion_diff'] for r in helical_results]
+        rmsd_h = [r['rmsd'] for r in helical_results]
+        ax1.scatter(torsion_h, rmsd_h, alpha=0.7, edgecolors='none', s=40,
+                   color='crimson', label=f'Both helical ({len(helical_results)})')
+
     ax1.set_xlabel('Mean Torsion Angle Difference (degrees)', fontsize=12)
     ax1.set_ylabel('RMSD (Angstroms)', fontsize=12)
     ax1.set_title('Torsion Angle Difference vs RMSD', fontsize=14)
     ax1.grid(True, alpha=0.3)
+    ax1.legend(loc='upper left', fontsize=10)
 
-    # Add correlation coefficient
+    # Add correlation coefficient for all data
+    torsion_diffs = [r['torsion_diff'] for r in results]
+    rmsds = [r['rmsd'] for r in results]
     corr1 = np.corrcoef(torsion_diffs, rmsds)[0, 1]
-    ax1.text(0.05, 0.95, f'r = {corr1:.3f}', transform=ax1.transAxes,
-             fontsize=11, verticalalignment='top',
+    ax1.text(0.95, 0.95, f'r = {corr1:.3f}', transform=ax1.transAxes,
+             fontsize=11, verticalalignment='top', horizontalalignment='right',
              bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
 
     # Plot 2: Pseudotorsion angle difference vs RMSD
     ax2 = axes[1]
-    ax2.scatter(pseudo_diffs, rmsds, alpha=0.5, edgecolors='none', s=30, color='orange')
+
+    # Plot non-helical pairs first (background)
+    if non_helical_results:
+        pseudo_nh = [r['pseudotorsion_diff'] for r in non_helical_results]
+        rmsd_nh = [r['rmsd'] for r in non_helical_results]
+        ax2.scatter(pseudo_nh, rmsd_nh, alpha=0.4, edgecolors='none', s=30,
+                   color='orange', label=f'Non-helical ({len(non_helical_results)})')
+
+    # Plot helical pairs on top
+    if helical_results:
+        pseudo_h = [r['pseudotorsion_diff'] for r in helical_results]
+        rmsd_h = [r['rmsd'] for r in helical_results]
+        ax2.scatter(pseudo_h, rmsd_h, alpha=0.7, edgecolors='none', s=40,
+                   color='darkgreen', label=f'Both helical ({len(helical_results)})')
+
     ax2.set_xlabel('Mean Pseudotorsion Angle Difference (degrees)', fontsize=12)
     ax2.set_ylabel('RMSD (Angstroms)', fontsize=12)
     ax2.set_title('Pseudotorsion Angle Difference vs RMSD', fontsize=14)
     ax2.grid(True, alpha=0.3)
+    ax2.legend(loc='upper left', fontsize=10)
 
     # Add correlation coefficient
+    pseudo_diffs = [r['pseudotorsion_diff'] for r in results]
     corr2 = np.corrcoef(pseudo_diffs, rmsds)[0, 1]
-    ax2.text(0.05, 0.95, f'r = {corr2:.3f}', transform=ax2.transAxes,
-             fontsize=11, verticalalignment='top',
+    ax2.text(0.95, 0.95, f'r = {corr2:.3f}', transform=ax2.transAxes,
+             fontsize=11, verticalalignment='top', horizontalalignment='right',
              bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
 
     plt.tight_layout()

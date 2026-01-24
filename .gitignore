@@ -1,3 +1,4 @@
 movies
 datasets
 *.png
+*.pyc
