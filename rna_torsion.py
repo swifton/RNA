@@ -12,9 +12,10 @@ except NameError:
 # For purines (G, A): N9, C4 are used for chi
 # For pyrimidines (C, U): N1, C2 are used for chi
 
-def rna_atoms(chain, res, next_res=None, base_type="purine"):
+def rna_atoms(chain, res, prev_res=None, next_res=None, base_type="purine"):
     """Generate atom selection strings for an RNA residue."""
     r = f"{chain}/{res}"
+    p = f"{chain}/{prev_res}" if prev_res else None
     n = f"{chain}/{next_res}" if next_res else None
     chi_atoms = ("N9", "C4") if base_type == "purine" else ("N1", "C2")
     return {
@@ -23,7 +24,9 @@ def rna_atoms(chain, res, next_res=None, base_type="purine"):
         "O4'": f"{r}/O4'", "C3'": f"{r}/C3'", "O3'": f"{r}/O3'",
         "C2'": f"{r}/C2'", "O2'": f"{r}/O2'", "C1'": f"{r}/C1'",
         "chi_N": f"{r}/{chi_atoms[0]}", "chi_C": f"{r}/{chi_atoms[1]}",
+        "prev_C4'": f"{p}/C4'" if p else None,
         "next_P": f"{n}/P" if n else None, "next_OP2": f"{n}/OP2" if n else None,
+        "next_C4'": f"{n}/C4'" if n else None,
     }
 
 def rna_torsion_angles(atoms):
@@ -43,25 +46,70 @@ def rna_torsion_angles(atoms):
     if a["next_P"] and a["next_OP2"]:
         angles["epsilon"] = [a["C4'"], a["C3'"], a["O3'"], a["next_P"]]
         angles["zeta"] = [a["C3'"], a["O3'"], a["next_P"], a["next_OP2"]]
+    # Pseudotorsion angles: eta = C4'(i-1)-P(i)-C4'(i)-P(i+1), theta = P(i)-C4'(i)-P(i+1)-C4'(i+1)
+    if a["prev_C4'"] and a["next_P"]:
+        angles["eta"] = [a["prev_C4'"], a["P"], a["C4'"], a["next_P"]]
+    if a["next_P"] and a["next_C4'"]:
+        angles["theta"] = [a["P"], a["C4'"], a["next_P"], a["next_C4'"]]
     return angles
 
+
+def setup_pseudobonds(atoms_list, object_name):
+    """Set up pseudobonds for pseudotorsion angle visualization.
+
+    Creates white bonds connecting C4'-P-C4'-P atoms and removes existing
+    backbone bonds so the pseudobonds can rotate freely.
+
+    Args:
+        atoms_list: List of atom dictionaries from rna_atoms()
+        object_name: Name of the PyMOL object
+    """
+    # Remove existing backbone bonds that would interfere with pseudotorsion rotation
+    for atoms in atoms_list:
+        # Remove bonds in the backbone between C4' and P
+        # These are: P-O5', O5'-C5', C5'-C4', C3'-O3', O3'-P(next)
+        # Keep C4'-C3' bond
+        cmd.unbond(atoms["P"], atoms["O5'"])
+        cmd.unbond(atoms["O5'"], atoms["C5'"])
+        cmd.unbond(atoms["C5'"], atoms["C4'"])
+        cmd.unbond(atoms["C3'"], atoms["O3'"])
+        if atoms["next_P"]:
+            cmd.unbond(atoms["O3'"], atoms["next_P"])
+
+    # Add pseudobonds - use selection that includes both atoms
+    for atoms in atoms_list:
+        curr_p = atoms["P"]
+        curr_c4 = atoms["C4'"]
+        next_p = atoms["next_P"]
+        if curr_c4:
+            selection = f"({curr_c4}) or ({curr_p})"
+            cmd.select("_pseudo_tmp", selection)
+            cmd.bond("_pseudo_tmp and name C4'", "_pseudo_tmp and name P")
+            cmd.delete("_pseudo_tmp")
+        # Add pseudobond from current C4' to next P
+        if next_p:
+            selection = f"({curr_c4}) or ({next_p})"
+            cmd.select("_pseudo_tmp", selection)
+            cmd.bond("_pseudo_tmp and name C4'", "_pseudo_tmp and name P")
+            cmd.delete("_pseudo_tmp")
+
 # Torsion angle definitions for 3G9Y-RNA-short.pdb (3 guanine nucleotides)
-atoms_3nt = rna_atoms("C", 2, 3, "purine")
+atoms_3nt = rna_atoms("C", 2, prev_res=1, next_res=3, base_type="purine")
 angles_3nt = rna_torsion_angles(atoms_3nt)
 torsion_angles_3nt = [angles_3nt["alpha"], angles_3nt["beta"], angles_3nt["gamma"],
                       angles_3nt["epsilon"], angles_3nt["zeta"], angles_3nt["chi"]]
 
 # Torsion angle definitions for 9KTW-RNA-3Cytosine.pdb (3 cytosine nucleotides)
-# Residue 11 (first cytosine) - has epsilon/zeta pointing to residue 12
-atoms_3cyt_11 = rna_atoms("C", 11, 12, "pyrimidine")
+# Residue 11 (first cytosine) - no prev_res, has next_res=12
+atoms_3cyt_11 = rna_atoms("C", 11, prev_res=None, next_res=12, base_type="pyrimidine")
 angles_3cyt_11 = rna_torsion_angles(atoms_3cyt_11)
 
-# Residue 12 (middle cytosine) - has epsilon/zeta pointing to residue 13
-atoms_3cyt_12 = rna_atoms("C", 12, 13, "pyrimidine")
+# Residue 12 (middle cytosine) - has prev_res=11, next_res=13
+atoms_3cyt_12 = rna_atoms("C", 12, prev_res=11, next_res=13, base_type="pyrimidine")
 angles_3cyt_12 = rna_torsion_angles(atoms_3cyt_12)
 
-# Residue 13 (last cytosine) - no epsilon/zeta (no next residue)
-atoms_3cyt_13 = rna_atoms("C", 13, None, "pyrimidine")
+# Residue 13 (last cytosine) - has prev_res=12, no next_res
+atoms_3cyt_13 = rna_atoms("C", 13, prev_res=12, next_res=None, base_type="pyrimidine")
 angles_3cyt_13 = rna_torsion_angles(atoms_3cyt_13)
 
 # Combined dictionary with residue numbers in angle names
@@ -117,7 +165,7 @@ def rotate(angle_names=None, directions=None):
         if direction == -1:
             angle_specs = angle_specs[::-1]  # Flip the angle
         initial_value = int(dihedral_angle(angle_specs))
-        for angle in range(initial_value, initial_value + 360, 10):
+        for angle in range(initial_value, initial_value + 360 * 5, 5):
             cmd.create(object_name, object_name, 1, frame + 1)
             set_torsion(angle_specs, angle, state=frame + 1)
             cmd.unpick()
@@ -151,7 +199,7 @@ def rotate_simultaneously(angle_names=None, directions=None):
         selected_angles.append(angle_specs)
     selected_initial = [int(dihedral_angle(a)) for a in selected_angles]
 
-    for step in range(0, 360, 1):
+    for step in range(0, 360, 5):
         cmd.create(object_name, object_name, 1, frame + 1)
         for angle_specs, initial_value in zip(selected_angles, selected_initial):
             new_angle = initial_value + step
@@ -164,9 +212,11 @@ def rotate_simultaneously(angle_names=None, directions=None):
     frame += 1
 
 # rotate_simultaneously(["alpha_12"], [1])
-rotate_simultaneously(["alpha_12", "gamma_12", "zeta_11"], [1, -1, 1])
+rotate_simultaneously(["alpha_12", "gamma_12"], [1, -1])
 
-# rotate()
+# setup_pseudobonds([atoms_3cyt_11, atoms_3cyt_12, atoms_3cyt_13], object_name)
+
+# rotate(["theta_12"], [1])
 
 # Set up movie from all states and play
 cmd.mset(f"1 -{frame}")
