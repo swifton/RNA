@@ -33,7 +33,7 @@ def rna_torsion_angles(atoms):
     """Define RNA torsion angles from atom dictionaries.
 
     All angles are in standard (direct) order: 5' to 3' direction.
-    Use direction=-1 in rotate/rotate_simultaneously to flip which side rotates.
+    Use flip=-1 in rotate/rotate_simultaneously to flip which side rotates.
     """
     a = atoms
     angles = {
@@ -145,29 +145,34 @@ object_name = cmd.get_names("objects")[0]  # Get the loaded molecule name
 
 frame = 1
 
-def rotate(angle_names=None, directions=None):
+def rotate(angle_names=None, flips=None, directions=None):
     """Rotate torsion angle(s) through 360 degrees sequentially.
 
     Args:
         angle_names: List of angle names to rotate (e.g., ["alpha", "beta"]),
                     or None to rotate all angles sequentially.
-        directions: List of directions (1 or -1) for each angle, or None for all positive.
-                   Direction -1 flips the angle so the opposite side of the molecule rotates.
+        flips: List of flips (1 or -1) for each angle, or None for all 1.
+               Flip -1 reverses the angle specs so the opposite side of the molecule rotates.
+        directions: List of directions (1 or -1) for each angle, or None for all 1.
+                   Direction -1 rotates counterclockwise instead of clockwise.
     """
     global frame
     if angle_names is None:
         angle_names = list(torsion_angles.keys())
+    if flips is None:
+        flips = [1] * len(angle_names)
     if directions is None:
         directions = [1] * len(angle_names)
 
-    for name, direction in zip(angle_names, directions):
+    for name, flip, direction in zip(angle_names, flips, directions):
         angle_specs = torsion_angles[name]
-        if direction == -1:
-            angle_specs = angle_specs[::-1]  # Flip the angle
+        if flip == -1:
+            angle_specs = angle_specs[::-1]  # Flip which side rotates
         initial_value = int(dihedral_angle(angle_specs))
-        for angle in range(initial_value, initial_value + 360 * 5, 5):
+        for step in range(0, 360 * 5, 5):
             cmd.create(object_name, object_name, 1, frame + 1)
-            set_torsion(angle_specs, angle, state=frame + 1)
+            new_angle = initial_value + step * direction
+            set_torsion(angle_specs, new_angle, state=frame + 1)
             cmd.unpick()
             frame += 1
         # Reset to initial value for next torsion angle
@@ -175,34 +180,39 @@ def rotate(angle_names=None, directions=None):
         frame += 1
 
 
-def rotate_simultaneously(angle_names=None, directions=None):
+def rotate_simultaneously(angle_names=None, flips=None, directions=None):
     """Rotate multiple torsion angles simultaneously (crankshaft motion).
 
     Args:
         angle_names: List of angle names to rotate (e.g., ["alpha", "gamma"]),
                     or None for all angles.
-        directions: List of directions (1 or -1) for each angle, or None for all positive.
-                   Direction -1 flips the angle so the opposite side of the molecule rotates.
+        flips: List of flips (1 or -1) for each angle, or None for all 1.
+               Flip -1 reverses the angle specs so the opposite side of the molecule rotates.
+        directions: List of directions (1 or -1) for each angle, or None for all 1.
+                   Direction -1 rotates counterclockwise instead of clockwise.
+                   Use opposite directions (e.g., [1, -1]) to visualize compensating rotations.
     """
     global frame
     if angle_names is None:
         angle_names = list(torsion_angles.keys())
+    if flips is None:
+        flips = [1] * len(angle_names)
     if directions is None:
         directions = [1] * len(angle_names)
 
-    # Get angle specs (flipped if direction is -1) and initial values
+    # Get angle specs (flipped if flip is -1) and initial values
     selected_angles = []
-    for name, direction in zip(angle_names, directions):
+    for name, flip in zip(angle_names, flips):
         angle_specs = torsion_angles[name]
-        if direction == -1:
-            angle_specs = angle_specs[::-1]  # Flip the angle
+        if flip == -1:
+            angle_specs = angle_specs[::-1]  # Flip which side rotates
         selected_angles.append(angle_specs)
     selected_initial = [int(dihedral_angle(a)) for a in selected_angles]
 
-    for step in range(0, 360, 5):
+    for step in range(0, 360 * 5, 5):
         cmd.create(object_name, object_name, 1, frame + 1)
-        for angle_specs, initial_value in zip(selected_angles, selected_initial):
-            new_angle = initial_value + step
+        for angle_specs, initial_value, direction in zip(selected_angles, selected_initial, directions):
+            new_angle = initial_value + step * direction
             set_torsion(angle_specs, new_angle, state=frame + 1)
             cmd.unpick()
         frame += 1
@@ -211,8 +221,8 @@ def rotate_simultaneously(angle_names=None, directions=None):
     cmd.create(object_name, object_name, 1, frame + 1)
     frame += 1
 
-# rotate_simultaneously(["alpha_12"], [1])
-rotate_simultaneously(["alpha_12", "gamma_12"], [1, -1])
+# rotate_simultaneously(["alpha_12"], flips=[1], directions=[1])
+rotate_simultaneously(["alpha_12", "gamma_12"], flips=[-1, -1], directions=[1, -1])
 
 # setup_pseudobonds([atoms_3cyt_11, atoms_3cyt_12, atoms_3cyt_13], object_name)
 
